@@ -32,8 +32,8 @@ def actions_from_pull_requests():
             if event.payload.get("action") == "closed" and event.payload.get(
                 "pull_request", {}
             ).get("merged"):
-                do_cohort_generation = False
-                do_model_run = False
+                needs_cohort_generation = False
+                needs_model_run = False
                 if event.payload["pull_request"]["base"]["ref"] == "master":
                     sha = event.payload["pull_request"]["merge_commit_sha"]
                     if most_recent_ref is None:
@@ -49,10 +49,10 @@ def actions_from_pull_requests():
                         if filename_matches_any(
                             triggers_cohort_generation, changed_file
                         ):
-                            do_cohort_generation = True
+                            needs_cohort_generation = True
                         if filename_matches_any(triggers_model_run, changed_file):
-                            do_model_run = True
-                flags.append((do_cohort_generation, do_model_run))
+                            needs_model_run = True
+                flags.append((needs_cohort_generation, needs_model_run))
         f.seek(0)
         f.write(most_recent_ref)
         f.truncate()
@@ -76,20 +76,54 @@ def enqueue_cohort_run():
 
 
 def handle_actions():
-    do_cohort_generation, do_model_run = actions_from_pull_requests()
+    needs_cohort_generation, needs_model_run = actions_from_pull_requests()
     currently_running_cohort_generation = False
     currently_running_model = False
-    if do_cohort_generation and do_model_run:
+    if needs_cohort_generation and needs_model_run:
         print("cancelling and restarting everything")
-    elif do_cohort_generation and not do_model_run:
+    elif needs_cohort_generation and not needs_model_run:
         print("if cohort generation is running, cancel and restart")
         print("if model generation is running, let it complete???")
-    elif do_model_run and not do_cohort_generation:
+    elif needs_model_run and not needs_cohort_generation:
         print("if cohort generation is running, cancel and restart")
         print("????")
 
 
+def deploy():
+    # check out master branch to location based on ref
+    pass
+
+
+def generate():
+    # triggers a docker generate_cohort
+    pass
+
+
+def run():
+    # triggers a docker run
+    pass
+
+
+def cancel_cohort():
+    # finds the docker container by id and kills it
+    pass
+
+
 handle_actions()
+
+# We want to *tell* the server when to deploy
+# os deploy
+#  * deploys with current ref
+# os list
+#  * lists current deploys
+# os generate <ref>
+#  already running!
+# os run <ref>
+#  already running!
+# os cancel cohort <ref>
+# os cancel run <ref>
+# os canel all <ref>
+# os remove <ref>
 
 # XXX handle run.exe possibly being open - everyone has their own run.exe?
 
