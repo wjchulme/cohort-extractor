@@ -1,6 +1,8 @@
 name: Tests
-
-on: [push]
+on:
+  push:
+    paths:
+    - "!action.log"
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
