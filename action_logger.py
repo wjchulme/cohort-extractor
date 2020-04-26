@@ -1,6 +1,6 @@
 import datetime
+import os
 
-import subprocess
 from argparse import ArgumentParser
 from time import sleep
 
@@ -10,33 +10,37 @@ ACTION_LOG = "action.log"
 REPO = "ebmdatalab/opencorona-research-template"
 
 FORMAT_STRING = "{commit}	{timestamp}	{begin_or_end}	{operation}\n"
-ACCESS_TOKEN = "49858f21380860e59446db84e5a9b5df85f38a11"
+ACCESS_TOKEN = os.environ["GITHUB_READ_PRIVATE_REPO_TOKEN"]
+
+
+def get_repo():
+    g = Github(ACCESS_TOKEN)
+    return g.get_repo(REPO)
+
+
+def get_log_file():
+    return get_repo().get_contents(ACTION_LOG)
 
 
 def log(commit, begin_or_end, operation):
     timestamp = datetime.datetime.now().isoformat()
-    with open(ACTION_LOG, "a+") as f:
-        f.write(
-            FORMAT_STRING.format(
-                commit=commit,
-                timestamp=timestamp,
-                begin_or_end=begin_or_end,
-                operation=operation,
-            )
-        )
-    # XXX assert on a clean master branch
-    subprocess.run(["git", "checkout", "-q", "master"], check=True)
-    subprocess.run(["git", "pull"], check=True)
-    subprocess.run(["git", "add", ACTION_LOG], check=True)
-    subprocess.run(["git", "commit", ACTION_LOG, "-m", "Logger automation"], check=True)
-    subprocess.run(["git", "push", "-q", "origin", "master"], check=True)
+    message = FORMAT_STRING.format(
+        commit=commit,
+        timestamp=timestamp,
+        begin_or_end=begin_or_end,
+        operation=operation,
+    )
+    log_file = get_log_file()
+    existing = log_file.decoded_content.decode("utf8")
+    existing += message
+    get_repo().update_file(
+        ACTION_LOG, message="Automatic logger", content=existing, sha=log_file.sha
+    )
 
 
 def wait_for(commit, begin_or_end, operation):
-    g = Github(ACCESS_TOKEN)
-    repo = g.get_repo(REPO)
     while True:
-        action_log = repo.get_contents(ACTION_LOG).decoded_content.decode("utf8")
+        action_log = get_log_file().decoded_content.decode("utf8")
         for line in action_log.split("\n"):
             if not line:
                 continue
@@ -49,7 +53,7 @@ def wait_for(commit, begin_or_end, operation):
                 and this_operation == operation
             ):
                 return
-        sleep(1)
+        sleep(5)
 
 
 def main():
