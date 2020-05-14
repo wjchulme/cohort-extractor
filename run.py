@@ -69,18 +69,6 @@ with open(os.path.join(os.path.dirname(__file__), "runner", "VERSION")) as versi
     __version__ = version_file.read().strip()
 
 
-def check_for_updates():
-    """Return required version as a string, or None if no updates are required
-    """
-    with open(
-        os.path.join(relative_dir(), "runner", "required_version.txt")
-    ) as version_file:
-        required_version = parse(version_file.read().strip())
-    supplied_version = parse(__version__)
-    if required_version > supplied_version:
-        return str(required_version)
-
-
 def await_jupyter_http(port):
     """Wait up to 10 seconds for Jupyter to be available
     """

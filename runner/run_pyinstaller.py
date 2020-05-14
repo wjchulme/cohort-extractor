@@ -12,23 +12,21 @@ import pkg_resources
 
 packages = list(pkg_resources.working_set)
 
-args = list(
+import_args = list(
     itertools.chain(
         *zip(["--hidden-import"] * len(packages), [p.project_name for p in packages])
     )
 )
+
+other_args = ["--paths=.", "--onefile", "--add-data", "runner/VERSION;runner"]
 run_cmd = (
-    ["pyinstaller"]
-    + args
-    + ["--onefile", "--add-data", "runner/VERSION;runner", "runner/windows_run.py",]
+    ["pyinstaller"] + import_args + other_args + ["runner/windows_run.py",]
 )
 subprocess.run(run_cmd, check=True)
 
 # This should make it smaller
-upgrade_cmd = ["pyinstaller"] + [
-    "--onefile",
-    "--add-data",
-    "runner/VERSION;runner",
-    "runner/windows_upgrade.py",
-]
+upgrade_cmd = (
+    ["pyinstaller"] + other_args + ["runner/windows_upgrade.py",]
+)
+
 subprocess.run(upgrade_cmd, check=True)
