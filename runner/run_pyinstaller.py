@@ -17,23 +17,18 @@ args = list(
         *zip(["--hidden-import"] * len(packages), [p.project_name for p in packages])
     )
 )
-wrapper_cmd = (
+run_cmd = (
     ["pyinstaller"]
     + args
-    + [
-        "--onefile",
-        "--add-data",
-        "runner/VERSION;runner",
-        "runner/windows_run_wrapper.py",
-    ]
+    + ["--onefile", "--add-data", "runner/VERSION;runner", "runner/windows_run.py",]
 )
-subprocess.run(wrapper_cmd, check=True)
+subprocess.run(run_cmd, check=True)
 
 # This should make it smaller
-run_cmd = ["pyinstaller"] + [
+upgrade_cmd = ["pyinstaller"] + [
     "--onefile",
     "--add-data",
     "runner/VERSION;runner",
-    "runner/windows_run.py",
+    "runner/windows_upgrade.py",
 ]
-subprocess.run(run_cmd, check=True)
+subprocess.run(upgrade_cmd, check=True)

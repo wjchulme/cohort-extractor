@@ -52,8 +52,8 @@ jobs:
         draft: false
         prerelease: true
         files: |
-          ./dist/windows_run_wrapper.exe
           ./dist/windows_run.exe
+          ./dist/windows_upgrade.exe
 
     - name: Create full (master branch) Release
       if: github.ref == 'master' || github.pull_request.merged == true
@@ -65,5 +65,5 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ./dist/windows_run_wrapper.exe
           ./dist/windows_run.exe
+          ./dist/windows_upgrade.exe
