@@ -1,11 +1,22 @@
 import pytest
 
 import pandas as pd
+import numpy as np
+from math import isclose
 
 from datalab_cohorts import StudyDefinition
 from datalab_cohorts import patients
 from datalab_cohorts import codelist
 from datalab_cohorts.expectation_generators import generate
+
+
+@pytest.fixture(autouse=True)
+def set_randomstate():
+    """Several tests include randomness in their output. Seed the PRNG to
+    make tests deterministic.
+
+    """
+    np.random.seed(1)
 
 
 def _converters_to_names(kwargs_dict):
@@ -67,7 +78,7 @@ def test_clinical_events_with_date_dtype_generation():
     study = StudyDefinition(
         population=patients.all(),
         diabetes=patients.with_these_clinical_events(
-            test_codelist, return_first_date_in_period=True, include_month=True
+            test_codelist, return_first_date_in_period=True, date_format="YYYY-MM",
         ),
     )
 
@@ -101,11 +112,9 @@ def test_categorical_clinical_events_with_date_dtype_generation():
     study = StudyDefinition(
         population=patients.all(),
         ethnicity=patients.with_these_clinical_events(
-            categorised_codelist,
-            returning="category",
-            find_last_match_in_period=True,
-            include_date_of_match=True,
+            categorised_codelist, returning="category", find_last_match_in_period=True,
         ),
+        ethnicity_date=patients.date_of("ethnicity"),
     )
 
     result = _converters_to_names(study.pandas_csv_args)
@@ -123,10 +132,7 @@ def test_categorical_clinical_events_without_date_dtype_generation():
     study = StudyDefinition(
         population=patients.all(),
         ethnicity=patients.with_these_clinical_events(
-            categorised_codelist,
-            returning="category",
-            find_last_match_in_period=True,
-            include_date_of_match=False,
+            categorised_codelist, returning="category", find_last_match_in_period=True,
         ),
     )
 
@@ -145,11 +151,9 @@ def test_bmi_dtype_generation():
     study = StudyDefinition(
         population=patients.all(),
         bmi=patients.most_recent_bmi(
-            on_or_after="2010-02-01",
-            minimum_age_at_measurement=16,
-            include_measurement_date=True,
-            include_month=True,
+            on_or_after="2010-02-01", minimum_age_at_measurement=16,
         ),
+        bmi_date_measured=patients.date_of("bmi", date_format="YYYY-MM"),
     )
 
     result = _converters_to_names(study.pandas_csv_args)
@@ -170,9 +174,8 @@ def test_clinical_events_numeric_value_dtype_generation():
             find_last_match_in_period=True,
             on_or_before="2020-02-01",
             returning="numeric_value",
-            include_date_of_match=True,
-            include_month=True,
         ),
+        creatinine_date=patients.date_of("creatinine", date_format="YYYY-MM"),
     )
     result = _converters_to_names(study.pandas_csv_args)
     assert result == {
@@ -191,9 +194,8 @@ def test_mean_recorded_value_dtype_generation():
             test_codelist,
             on_most_recent_day_of_measurement=True,
             on_or_before="2020-02-01",
-            include_measurement_date=True,
-            include_month=True,
         ),
+        bp_sys_date_measured=patients.date_of("bp_sys", date_format="YYYY-MM"),
     )
     result = _converters_to_names(study.pandas_csv_args)
     assert result == {
@@ -204,7 +206,7 @@ def test_mean_recorded_value_dtype_generation():
     }
 
 
-def test_data_generator_date():
+def test_data_generator_date_exponential_increase():
     population_size = 10000
     incidence = 0.2
     return_expectations = {
@@ -227,6 +229,26 @@ def test_data_generator_date():
         assert count < max_count
         max_count = count
 
+def test_data_generator_date_uniform():
+    population_size = 100000
+    incidence = 0.5
+    return_expectations = {
+        "rate": "uniform",
+        "incidence": incidence,
+        "date": {"earliest": "2020-01-01", "latest": "2020-01-11"},
+    }
+    result = generate(population_size, **return_expectations)
+
+    # Check incidence numbers are correct
+    null_rows = result[~pd.isnull(result["date"])]
+    assert len(null_rows) == (population_size * incidence)
+
+    # Check dates are distributed approximately evenly
+    date_counts = result["date"].reset_index().groupby("date").count()["index"]
+
+    expected = (population_size * incidence) / 10
+    for count in date_counts:
+        assert isclose(count, expected, rel_tol=0.1)
 
 def test_data_generator_category_and_date():
     population_size = 10000
@@ -235,7 +257,7 @@ def test_data_generator_category_and_date():
         "rate": "exponential_increase",
         "incidence": incidence,
         "category": {"ratios": {"A": 0.1, "B": 0.7, "C": 0.2}},
-        "date": {"earliest": "1900-01-01", "latest": "today"},
+        "date": {"earliest": "1900-01-01", "latest": "2020-01-01"},
     }
     result = generate(population_size, **return_expectations)
 
@@ -256,6 +278,7 @@ def test_data_generator_float():
     return_expectations = {
         "rate": "exponential_increase",
         "incidence": incidence,
+        "date": {"earliest": "1900-01-01", "latest": "2020-01-01"},
         "float": {"distribution": "normal", "mean": 35, "stddev": 10},
     }
     result = generate(population_size, **return_expectations)
@@ -268,6 +291,7 @@ def test_data_generator_int():
     return_expectations = {
         "rate": "exponential_increase",
         "incidence": incidence,
+        "date": {"earliest": "1900-01-01", "latest": "2020-01-01"},
         "int": {"distribution": "normal", "mean": 10, "stddev": 1},
     }
     result = generate(population_size, **return_expectations)
@@ -280,6 +304,7 @@ def test_data_generator_bool():
     return_expectations = {
         "rate": "exponential_increase",
         "incidence": incidence,
+        "date": {"earliest": "1900-01-01", "latest": "2020-01-01"},
         "bool": True,
     }
     result = generate(population_size, **return_expectations)
@@ -290,6 +315,7 @@ def test_data_generator_universal_category():
     population_size = 10000
     return_expectations = {
         "rate": "universal",
+        "date": {"earliest": "1900-01-01", "latest": "2020-01-01"},
         "category": {"ratios": {"rural": 0.1, "urban": 0.9}},
     }
     result = generate(population_size, **return_expectations)
@@ -303,6 +329,7 @@ def test_data_generator_age():
     population_size = 10000
     return_expectations = {
         "rate": "universal",
+        "date": {"earliest": "1900-01-01", "latest": "2020-01-01"},
         "int": {"distribution": "population_ages"},
     }
     result = generate(population_size, **return_expectations)
@@ -324,7 +351,6 @@ def test_make_df_from_expectations_with_categories():
                 "date": {"earliest": "1900-01-01", "latest": "today"},
             },
             find_last_match_in_period=True,
-            include_date_of_match=False,
         ),
     )
     population_size = 10000
@@ -350,7 +376,6 @@ def test_make_df_from_expectations_with_categories_in_codelist_validation():
                 "date": {"earliest": "1900-01-01", "latest": "today"},
             },
             find_last_match_in_period=True,
-            include_date_of_match=False,
         ),
     )
     population_size = 10000
@@ -403,6 +428,7 @@ def test_make_df_no_categories_validation_when_no_categories_in_definition():
         sex=patients.sex(
             return_expectations={
                 "rate": "universal",
+                "date": {"earliest": "1900-01-01", "latest": "today"},
                 "category": {"ratios": {"M": 0.49, "F": 0.51}},
             }
         ),
@@ -425,8 +451,7 @@ def test_make_df_from_expectations_with_date_filter():
                 "date": {"earliest": "1900-01-01", "latest": "today"},
             },
             find_first_match_in_period=True,
-            include_month=True,
-            include_day=True,
+            date_format="YYYY-MM-DD",
         ),
     )
     population_size = 10000
@@ -435,20 +460,33 @@ def test_make_df_from_expectations_with_date_filter():
     assert result[~pd.isnull(result["asthma_condition"])].max()[0] <= "2002-06-01"
 
 
+def test_apply_date_filters_from_definition():
+    study = StudyDefinition(population=patients.all())
+    series = np.arange(10)
+
+    result = list(study.apply_date_filters_from_definition(series, between=[5, 6]))
+    assert result == [5, 6]
+
+    result = list(study.apply_date_filters_from_definition(series, between=[5, None]))
+    assert result == [5, 6, 7, 8, 9]
+
+    result = list(study.apply_date_filters_from_definition(series, between=[None, 2]))
+    assert result == [0, 1, 2]
+
+
 def test_make_df_from_expectations_returning_date_using_defaults():
     study = StudyDefinition(
         default_expectations={
             "date": {"earliest": "1900-01-01", "latest": "today"},
             "rate": "exponential_increase",
+            "incidence": 0.2,
         },
         population=patients.all(),
         asthma_condition=patients.with_these_clinical_events(
             codelist(["X"], system="ctv3"),
             returning="date",
-            return_expectations={"incidence": 0.2},
             find_first_match_in_period=True,
-            include_month=True,
-            include_day=True,
+            date_format="YYYY-MM-DD",
         ),
     )
     population_size = 10000
@@ -462,8 +500,6 @@ def test_make_df_from_expectations_with_distribution_and_date():
         bmi=patients.most_recent_bmi(
             on_or_after="2010-02-01",
             minimum_age_at_measurement=16,
-            include_measurement_date=True,
-            include_month=True,
             return_expectations={
                 "rate": "exponential_increase",
                 "incidence": 0.6,
@@ -471,6 +507,7 @@ def test_make_df_from_expectations_with_distribution_and_date():
                 "date": {"earliest": "1900-01-01", "latest": "today"},
             },
         ),
+        bmi_date_measured=patients.date_of("bmi", date_format="YYYY-MM",),
     )
     population_size = 10000
     result = study.make_df_from_expectations(population_size)
@@ -491,6 +528,7 @@ def test_make_df_from_expectations_with_mean_recorded_value():
             on_most_recent_day_of_measurement=True,
             return_expectations={
                 "rate": "exponential_increase",
+                "date": {"earliest": "1900-01-01", "latest": "today"},
                 "incidence": 0.6,
                 "float": {"distribution": "normal", "mean": 35, "stddev": 10},
             },
@@ -499,3 +537,141 @@ def test_make_df_from_expectations_with_mean_recorded_value():
     population_size = 10000
     result = study.make_df_from_expectations(population_size)
     assert abs(35 - int(result["drug_x"].mean())) < 5
+
+
+def test_make_df_from_binary_default_outcome():
+    study = StudyDefinition(
+        population=patients.all(),
+        died=patients.died_from_any_cause(
+            return_expectations={
+                "date": {"earliest": "1900-01-01", "latest": "today"},
+                "incidence": 0.1,
+            }
+        ),
+    )
+    population_size = 10000
+    result = study.make_df_from_expectations(population_size)
+    assert len(result[~pd.isnull(result.died)]) == 0.1 * population_size
+
+
+def test_make_df_from_expectations_with_number_of_episodes():
+    study = StudyDefinition(
+        population=patients.all(),
+        episode_count=patients.with_these_clinical_events(
+            codelist(["A", "B", "C"], system="ctv3"),
+            ignore_days_where_these_codes_occur=codelist(["D", "E"], system="ctv3"),
+            returning="number_of_episodes",
+            episode_defined_as="series of events each <= 14 days apart",
+            return_expectations={
+                "int": {"distribution": "normal", "mean": 4, "stddev": 2},
+                "date": {"earliest": "1900-01-01", "latest": "today"},
+                "incidence": 0.2,
+            },
+        ),
+    )
+    population_size = 10000
+    result = study.make_df_from_expectations(population_size)
+    assert result.columns == ["episode_count"]
+
+
+def test_make_df_from_expectations_doesnt_alter_defaults():
+    study = StudyDefinition(
+        default_expectations={
+            "rate": "exponential_increase",
+            "incidence": 1.0,
+            "date": {"earliest": "1900-01-01", "latest": "today"},
+            "category": {"ratios": {"M": 0.5, "F": 0.5}},
+        },
+        population=patients.all(),
+        sex_altered=patients.sex(
+            return_expectations={
+                "incidence": 0.1,
+                "category": {"ratios": {"M": 0.5, "F": 0.5}},
+            }
+        ),
+        sex_default=patients.sex(
+            return_expectations={"category": {"ratios": {"M": 0.5, "F": 0.5}}}
+        ),
+    )
+    population_size = 10000
+    # Just ensuring no exception is raised
+    result = study.make_df_from_expectations(population_size)
+    assert len(result[pd.isnull(result.sex_default)]) == 0
+
+
+def test_make_df_from_expectations_doesnt_alter_date_defaults():
+
+    study = StudyDefinition(
+        default_expectations={
+            "rate": "exponential_increase",
+            "incidence": 1.0,
+            "date": {"earliest": "1900-01-01", "latest": "today"},
+            "category": {"ratios": {"M": 0.5, "F": 0.5}},
+        },
+        population=patients.all(),
+        with_different_incidence=patients.with_these_clinical_events(
+            codelist(["X"], system="ctv3"),
+            returning="date",
+            return_expectations={"incidence": 0.2},
+            include_day=True,
+        ),
+        with_different_date=patients.with_these_clinical_events(
+            codelist(["X"], system="ctv3"),
+            returning="date",
+            return_expectations={"date": {"earliest": "2015-01-01", "latest": "today"}},
+            include_day=True,
+        ),
+        with_defaults=patients.with_these_clinical_events(
+            codelist(["X"], system="ctv3"), returning="date", include_day=True
+        ),
+    )
+    population_size = 10000
+    result = study.make_df_from_expectations(population_size)
+
+    # Regression test: make sure defaults are respected even when they've been overridden
+    assert result.with_defaults.min() < "2015-01-01"
+    assert len(result[pd.isnull(result.with_defaults)]) == 0
+
+
+def test_validate_category_expectations():
+    categorised_codelist = codelist([("X", "Y")], system="ctv3")
+    categorised_codelist.has_categories = True
+
+    category_definitions = {"A": "sex = 'F'", "B": "sex = 'M'"}
+    study = StudyDefinition(population=patients.all())
+
+    # validate against codelists
+    with pytest.raises(ValueError):
+        study.validate_category_expectations(
+            codelist=categorised_codelist,
+            return_expectations={"category": {"ratios": {"X": 1}}},
+        )
+    study.validate_category_expectations(
+        codelist=categorised_codelist,
+        return_expectations={"category": {"ratios": {"Y": 1}}},
+    )
+
+    # validate against definitions
+    with pytest.raises(ValueError):
+        study.validate_category_expectations(
+            category_definitions=category_definitions,
+            return_expectations={"category": {"ratios": {"X": 1}}},
+        )
+    study.validate_category_expectations(
+        category_definitions=category_definitions,
+        return_expectations={"category": {"ratios": {"A": 1}}},
+    )
+
+    # validate that supplied category definitions override categories
+    # in codelists
+    with pytest.raises(ValueError):
+        study.validate_category_expectations(
+            codelist=categorised_codelist,
+            category_definitions=category_definitions,
+            return_expectations={"category": {"ratios": {"Y": 1}}},
+        )
+    study.validate_category_expectations(
+        codelist=categorised_codelist,
+        category_definitions=category_definitions,
+        return_expectations={"category": {"ratios": {"A": 1}}},
+    )
