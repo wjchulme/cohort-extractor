@@ -17,7 +17,7 @@ args = list(
         *zip(["--hidden-import"] * len(packages), [p.project_name for p in packages])
     )
 )
-cmd = (
+wrapper_cmd = (
     ["pyinstaller"]
     + args
     + [
@@ -25,7 +25,15 @@ cmd = (
         "--add-data",
         "runner/VERSION;runner",
         "runner/windows_run_wrapper.py",
-        "runner/windows_run.py",
     ]
 )
-subprocess.run(cmd, check=True)
+subprocess.run(wrapper_cmd, check=True)
+
+# This should make it smaller
+run_cmd = ["pyinstaller"] + [
+    "--onefile",
+    "--add-data",
+    "runner/VERSION;runner",
+    "runner/windows_run.py",
+]
+subprocess.run(run_cmd, check=True)
