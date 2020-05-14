@@ -1,6 +1,6 @@
 import sys
 
-from windows_upgrade import check_for_updates
+from runner.windows_upgrade import check_for_updates
 from run import possibly_start_with_gui
 
 if check_for_updates():
