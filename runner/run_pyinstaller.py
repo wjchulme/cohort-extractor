@@ -18,7 +18,14 @@ import_args = list(
     )
 )
 
-other_args = ["--paths=.", "--onefile", "--add-data", "runner/VERSION;runner"]
+other_args = [
+    "--paths=.",
+    "--onefile",
+    "--add-data",
+    "runner/VERSION;runner",
+    "--exclude-module",
+    "run",
+]
 run_cmd = (
     ["pyinstaller"] + import_args + other_args + ["runner/windows_run.py",]
 )
