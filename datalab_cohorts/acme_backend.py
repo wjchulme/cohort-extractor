@@ -203,11 +203,14 @@ class ACMEBackend:
         table_number = len(self.codelist_tables) + 1
         # We include the current column name for ease of debugging
         column_name = self._current_column_name or "unknown"
-        # The hash prefix indicates a temporary table
+        # The underscore prefix is our convention to indicate a temporary table
+        # but has no significance for the database
         table_name = f"_codelist_{table_number}_{column_name}"
+        cast = int if codelist.system in ("snomed", "snomedct") else str
         if codelist.has_categories:
             values = ", ".join(
-                f"({quote(code)}, {quote(category)})" for code, category in codelist
+                f"({quote(cast(code))}, {quote(category)})"
+                for code, category in codelist
             )
             self.codelist_tables.append(
                 f"""
@@ -218,7 +221,7 @@ class ACMEBackend:
                     """
             )
         else:
-            values = ", ".join(f"({quote(code)})" for code in codelist)
+            values = ", ".join(f"({quote(cast(code))})" for code in codelist)
             self.codelist_tables.append(
                 f"""
                     CREATE TABLE {table_name} AS
@@ -472,6 +475,7 @@ class ACMEBackend:
         Patients who have had at least one of these clinical events in the
         defined period
         """
+        assert kwargs["codelist"].system == "snomedct"
         # This uses a special case function with a "fake it til you make it" API
         if kwargs["returning"] == "number_of_episodes":
             kwargs.pop("returning")

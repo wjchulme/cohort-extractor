@@ -105,6 +105,24 @@ def test_meds():
     assert [x["asthma_meds"] for x in results] == ["1", "0"]
 
 
+def test_meds_with_string_codes():
+    session = make_session()
+
+    patient_with_med = Patient()
+    patient_with_med.medications = [Medication(snomed_concept_id=123)]
+    patient_without_med = Patient()
+    session.add(patient_with_med)
+    session.add(patient_without_med)
+    session.commit()
+
+    study = StudyDefinition(
+        population=patients.all(),
+        asthma_meds=patients.with_these_medications(codelist(["123"], "snomed")),
+    )
+    results = study.to_dicts()
+    assert [x["asthma_meds"] for x in results] == ["1", "0"]
+
+
 def test_meds_with_count():
     session = make_session()
 
@@ -163,6 +181,19 @@ def test_clinical_event_without_filters():
     condition_code = 195967001
     _make_clinical_events_selection(condition_code)
     # No date criteria
+    study = StudyDefinition(
+        population=patients.all(),
+        asthma_condition=patients.with_these_clinical_events(
+            codelist([condition_code], "snomedct")
+        ),
+    )
+    results = study.to_dicts()
+    assert [x["asthma_condition"] for x in results] == ["1", "1", "0"]
+
+
+def test_clinical_event_with_codes_as_strings():
+    condition_code = "195967001"
+    _make_clinical_events_selection(condition_code)
     study = StudyDefinition(
         population=patients.all(),
         asthma_condition=patients.with_these_clinical_events(
