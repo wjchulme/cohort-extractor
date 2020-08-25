@@ -23,13 +23,18 @@ from pandas.api.types import is_categorical_dtype
 from pandas.api.types import is_bool_dtype
 from pandas.api.types import is_datetime64_dtype
 from pandas.api.types import is_numeric_dtype
+from prettytable import PrettyTable
 import yaml
 
 from datetime import datetime
 import seaborn as sns
 
+from cohortextractor.remotejobs import get_branch
 from cohortextractor.remotejobs import get_job_logs
+from cohortextractor.remotejobs import list_workspaces
 from cohortextractor.remotejobs import submit_job
+from cohortextractor.remotejobs import submit_workspace
+from cohortextractor.localrun import localrun
 
 notebook_tag = "opencorona-research"
 target_dir = "/home/app/notebook"
@@ -95,8 +100,7 @@ def make_chart(name, series, dtype):
 
 
 def preflight_generation_check():
-    """Raise an informative error if things are not as they should be
-    """
+    """Raise an informative error if things are not as they should be"""
     missing_paths = []
     required_paths = ["codelists/", "analysis/"]
     for p in required_paths:
@@ -156,13 +160,17 @@ def _make_cohort_report(input_dir, output_dir, study_name, suffix):
         empty_values_chart = ""
         if is_datetime64_dtype(dtype):
             # also do a null / not null plot
-            empty_values_chart = '<div><img src="data:image/png;base64,{}"/></div>'.format(
-                make_chart(name, df[name].isnull(), bool)
+            empty_values_chart = (
+                '<div><img src="data:image/png;base64,{}"/></div>'.format(
+                    make_chart(name, df[name].isnull(), bool)
+                )
             )
         elif is_numeric_dtype(dtype):
             # also do a null / not null plot
-            empty_values_chart = '<div><img src="data:image/png;base64,{}"/></div>'.format(
-                make_chart(name, df[name] > 0, bool)
+            empty_values_chart = (
+                '<div><img src="data:image/png;base64,{}"/></div>'.format(
+                    make_chart(name, df[name] > 0, bool)
+                )
             )
         descriptives.loc["values", name] = main_chart
         descriptives.loc["nulls", name] = empty_values_chart
@@ -270,6 +278,8 @@ def main():
         "generate_cohort", help="Generate cohort"
     )
     generate_cohort_parser.set_defaults(which="generate_cohort")
+    run_parser = subparsers.add_parser("run", help="Run action from project.yaml")
+    run_parser.set_defaults(which="run")
     cohort_report_parser = subparsers.add_parser(
         "cohort_report", help="Generate cohort report"
     )
@@ -314,44 +324,55 @@ def main():
 
     # Remote subcommands
     remote_subparser = remote_parser.add_subparsers(help="Remote sub-command help")
-    generate_cohort_remote_parser = remote_subparser.add_parser(
-        "generate_cohort", help="Generate cohort"
+
+    remote_run_subparser = remote_subparser.add_parser("run", help="Run an action")
+    remote_run_subparser.set_defaults(which="remote_run")
+
+    remote_workspace_subparser = remote_subparser.add_parser(
+        "workspace", help="Manage workspaces"
     )
-    generate_cohort_remote_parser.set_defaults(which="remote_generate_cohort")
-    generate_cohort_remote_parser.add_argument(
-        "--ref",
-        help="Tag or branch against which to run the extraction",
-        type=str,
-        required=True,
+    remote_workspace_action_subparser = remote_workspace_subparser.add_subparsers(
+        help="Remote workspace sub-command help"
     )
-    generate_cohort_remote_parser.add_argument(
-        "--repo",
-        help="Tag or branch against which to run the extraction (leave blank for current repo)",
-        type=str,
+    remote_workspace_add_action_subparser = (
+        remote_workspace_action_subparser.add_parser("add", help="Add a workspace")
     )
-    generate_cohort_remote_parser.add_argument(
-        "--db",
+    remote_workspace_list_action_subparser = (
+        remote_workspace_action_subparser.add_parser("list", help="List workspaces")
+    )
+    remote_workspace_add_action_subparser.set_defaults(which="workspace_add")
+    remote_workspace_list_action_subparser.set_defaults(which="workspace_list")
+
+    remote_workspace_add_action_subparser.add_argument(
+        "workspace", help="id of workspace", type=str
+    )
+    remote_workspace_add_action_subparser.add_argument(
+        "db",
         help="Database to run against",
         choices=["full", "slice", "dummy"],
-        nargs="?",
-        const="full",
-        default="full",
-        type=str,
-    )
-    generate_cohort_remote_parser.add_argument(
-        "--backend",
-        help="Backend to run against",
-        choices=["all", "tpp"],
-        nargs="?",
-        const="all",
-        default="all",
         type=str,
     )
 
+    remote_run_subparser.add_argument(
+        "workspace",
+        help="Workspace name",
+        type=str,
+    )
+    remote_run_subparser.add_argument(
+        "action",
+        help="Action to execute",
+        type=str,
+    )
+    remote_run_subparser.add_argument(
+        "backend",
+        help="Backend to execute against",
+        choices=["tpp", "all"],
+        type=str,
+        default="all",
+    )
     log_remote_parser = remote_subparser.add_parser("log", help="Show logs")
     log_remote_parser.set_defaults(which="remote_log")
 
-    # Cohort parser options
     generate_cohort_parser.add_argument(
         "--output-dir",
         help="Location to store output CSVs",
@@ -392,15 +413,40 @@ def main():
         print(f"v{cohortextractor.__version__}")
     elif not hasattr(options, "which"):
         parser.print_help()
-    elif options.which == "generate_cohort":
-        os.environ["DATABASE_URL"] = options.database_url
+    elif options.which == "run":
         if options.temp_database_name:
             os.environ["TEMP_DATABASE_NAME"] = options.temp_database_name
-        generate_cohort(
-            options.output_dir,
-            options.expectations_population,
-            options.study_definition,
+        options.high_privacy_output_dir = os.path.abspath(
+            options.high_privacy_output_dir
         )
+        options.medium_privacy_output_dir = os.path.abspath(
+            options.medium_privacy_output_dir
+        )
+        os.makedirs(options.high_privacy_output_dir, exist_ok=True)
+        os.makedirs(options.medium_privacy_output_dir, exist_ok=True)
+
+        result = localrun(
+            options.action,
+            options.backend,
+            options.db,
+            options.high_privacy_output_dir,
+            options.medium_privacy_output_dir,
+        )
+        if result:
+            print("Generated outputs:")
+            output = PrettyTable()
+            output.field_names = ["status", "path"]
+            for action in result:
+                output.add_row(
+                    [
+                        action["status_message"],
+                        os.path.relpath(os.path.join(base, relpath)),
+                    ]
+                )
+            print(output)
+        else:
+            print("Nothing to do")
+
     elif options.which == "cohort_report":
         make_cohort_report(options.input_dir, options.output_dir)
     elif options.which == "update_codelists":
@@ -410,14 +456,42 @@ def main():
         dump_cohort_sql(options.study_definition)
     elif options.which == "dump_study_yaml":
         dump_study_yaml(options.study_definition)
-    elif options.which == "remote_generate_cohort":
-        submit_job(
-            options.backend, options.db, options.ref, "generate_cohort", options.repo,
-        )
-        print("Job submitted!")
+    elif options.which == "workspace_add":
+        workspace = submit_workspace(options.workspace, options.db)
+        print(f"Workspace submitted: {workspace['url']}")
+    elif options.which == "workspace_list":
+        output = PrettyTable()
+        output.field_names = ["id", "name"]
+        for workspace in list_workspaces():
+            output.add_row([workspace["id"], workspace["name"]])
+        print(output)
+    elif options.which == "remote_run":
+        jobs = submit_job(options.workspace, options.backend, options.action)
+        for job in jobs:
+            print(f"Job submitted to {job['backend']}: {job['url']}")
     elif options.which == "remote_log":
-        logs = get_job_logs()
-        print("\n".join(logs))
+        output = PrettyTable()
+        output.field_names = ["created", "action", "workspace", "backend", "status"]
+        for entry in get_job_logs():
+            if not entry["started"]:
+                status = "not started"
+            elif entry["status_code"] is None:
+                status = "running"
+            elif entry["status_code"] == 0:
+                status = f"finished ({entry['output_bucket']})"
+            else:
+                status = f"error ({entry['status_code']})"
+            entry["status"] = status
+            output.add_row(
+                [
+                    entry["created_at"],
+                    entry["operation"],
+                    entry["workspace"]["name"],
+                    entry["backend"],
+                    status,
+                ]
+            )
+        print(output)
 
 
 if __name__ == "__main__":

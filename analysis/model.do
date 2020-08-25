@@ -1,1 +1,2 @@
-import delimited `c(pwd)'/output/input.csv
+args csv
+import delimited `csv'
