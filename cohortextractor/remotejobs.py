@@ -6,7 +6,6 @@ import requests
 import subprocess
 
 JOB_SERVER = "https://jobs.opensafely.org"
-JOB_SERVER = "http://localhost:8000"
 JOB_ENDPOINT = f"{JOB_SERVER}/jobs/"
 WORKSPACE_ENDPOINT = f"{JOB_SERVER}/workspaces/"
 
