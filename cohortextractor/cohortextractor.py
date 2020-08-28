@@ -478,7 +478,7 @@ def main():
             elif entry["status_code"] is None:
                 status = "running"
             elif entry["status_code"] == 0:
-                status = f"finished ({entry['output_bucket']})"
+                status = f"finished ({len(entry['outputs'])} outputs generated)"
             else:
                 status = f"error ({entry['status_code']})"
             entry["status"] = status
