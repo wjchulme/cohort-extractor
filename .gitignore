@@ -8,3 +8,6 @@ outputs*
 # setuptools stuff
 *.egg-info
 .eggs
+
+# vscode
+settings.json
