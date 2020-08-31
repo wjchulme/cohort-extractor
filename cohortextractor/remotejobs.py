@@ -91,7 +91,9 @@ def list_workspaces():
     return do_get(WORKSPACE_ENDPOINT, {"owner": getpass.getuser()})["results"]
 
 
-def submit_job(workspace_id, backend, action):
+def submit_job(
+    workspace_id, backend, action, force_run=False, force_run_dependencies=False
+):
     allowed_backends = ["all", "tpp"]
     if backend == "all":
         backends = allowed_backends[:]
@@ -103,7 +105,8 @@ def submit_job(workspace_id, backend, action):
     responses = []
     for backend in backends:
         data = {
-            "backend": backend,
+            "force_run": force_run,
+            "force_run_dependencies": force_run_dependencies,
             "operation": action,
             "workspace_id": existing_workspace[0]["id"],
         }

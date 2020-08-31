@@ -5,6 +5,8 @@ start a notebook, open a web browser on the correct port, and handle
 shutdowns gracefully
 """
 import cohortextractor
+import datetime
+from datetime import timedelta
 import glob
 import importlib
 import os
@@ -280,6 +282,47 @@ def main():
     generate_cohort_parser.set_defaults(which="generate_cohort")
     run_parser = subparsers.add_parser("run", help="Run action from project.yaml")
     run_parser.set_defaults(which="run")
+
+    run_parser.add_argument(
+        "db",
+        help="Database to run against",
+        choices=["full", "slice", "dummy"],
+        type=str,
+    )
+    run_parser.add_argument(
+        "action",
+        help="Action to execute",
+        type=str,
+    )
+    run_parser.add_argument(
+        "backend",
+        help="Backend to execute against",
+        choices=["expectations", "tpp", "all"],
+        type=str,
+        default="all",
+    )
+    run_parser.add_argument(
+        "--force-run",
+        help="Force a new run for the action",
+        action="store_true",
+    )
+    run_parser.add_argument(
+        "--force-run-dependencies",
+        help="Force a new run for the action and all its dependencies (only when `--force-run` is also specified)",
+        action="store_true",
+    )
+    run_parser.add_argument(
+        "--high-privacy-output-dir",
+        help="Path for high privacy outputs",
+        type=str,
+        default="outputs/high_privacy",
+    )
+    run_parser.add_argument(
+        "--medium-privacy-output-dir",
+        help="Path for medium privacy outputs",
+        type=str,
+        default="outputs/medium_privacy",
+    )
     cohort_report_parser = subparsers.add_parser(
         "cohort_report", help="Generate cohort report"
     )
@@ -299,6 +342,7 @@ def main():
 
     run_notebook_parser = subparsers.add_parser("notebook", help="Run notebook")
     run_notebook_parser.set_defaults(which="notebook")
+
     update_codelists_parser = subparsers.add_parser(
         "update_codelists",
         help="Update codelists, using specification at codelists/codelists.txt",
@@ -365,10 +409,19 @@ def main():
     )
     remote_run_subparser.add_argument(
         "backend",
-        help="Backend to execute against",
         choices=["tpp", "all"],
         type=str,
         default="all",
+    )
+    remote_run_subparser.add_argument(
+        "--force-run",
+        help="Force a new run for the action",
+        action="store_true",
+    )
+    remote_run_subparser.add_argument(
+        "--force-run-dependencies",
+        help="Force a new run for the action and all its dependencies",
+        action="store_true",
     )
     log_remote_parser = remote_subparser.add_parser("log", help="Show logs")
     log_remote_parser.set_defaults(which="remote_log")
@@ -409,13 +462,13 @@ def main():
     )
 
     options = parser.parse_args()
+    if options.force_run_dependencies and not options.force_run:
+        parser.error("`--force-run-dependencies` requires `--force-run`")
     if options.version:
         print(f"v{cohortextractor.__version__}")
     elif not hasattr(options, "which"):
         parser.print_help()
     elif options.which == "run":
-        if options.temp_database_name:
-            os.environ["TEMP_DATABASE_NAME"] = options.temp_database_name
         options.high_privacy_output_dir = os.path.abspath(
             options.high_privacy_output_dir
         )
@@ -424,25 +477,29 @@ def main():
         )
         os.makedirs(options.high_privacy_output_dir, exist_ok=True)
         os.makedirs(options.medium_privacy_output_dir, exist_ok=True)
-
         result = localrun(
             options.action,
             options.backend,
             options.db,
             options.high_privacy_output_dir,
             options.medium_privacy_output_dir,
+            force_run=options.force_run,
+            force_run_dependencies=options.force_run_dependencies,
         )
         if result:
             print("Generated outputs:")
             output = PrettyTable()
             output.field_names = ["status", "path"]
+
             for action in result:
-                output.add_row(
-                    [
-                        action["status_message"],
-                        os.path.relpath(os.path.join(base, relpath)),
-                    ]
-                )
+                for location in action["output_locations"]:
+                    location = os.path.relpath(location)
+                    output.add_row(
+                        [
+                            action["status_message"],
+                            location,
+                        ]
+                    )
             print(output)
         else:
             print("Nothing to do")
@@ -466,12 +523,25 @@ def main():
             output.add_row([workspace["id"], workspace["name"]])
         print(output)
     elif options.which == "remote_run":
-        jobs = submit_job(options.workspace, options.backend, options.action)
+        jobs = submit_job(
+            options.workspace,
+            options.backend,
+            options.action,
+            force_run=options.force_run,
+            force_run_dependencies=options.force_run_dependencies,
+        )
         for job in jobs:
             print(f"Job submitted to {job['backend']}: {job['url']}")
     elif options.which == "remote_log":
         output = PrettyTable()
-        output.field_names = ["created", "action", "workspace", "backend", "status"]
+        output.field_names = [
+            "created",
+            "action",
+            "workspace",
+            "backend",
+            "status",
+            "run time",
+        ]
         for entry in get_job_logs():
             if not entry["started"]:
                 status = "not started"
@@ -482,13 +552,30 @@ def main():
             else:
                 status = f"error ({entry['status_code']})"
             entry["status"] = status
+            created_at = datetime.fromisoformat(
+                entry["created_at"].replace("Z", "+00:00")
+            )
+            completed_at = (
+                entry["completed_at"]
+                and datetime.fromisoformat(entry["completed_at"].replace("Z", "+00:00"))
+                or None
+            )
+            if completed_at:
+                elapsed = completed_at - created_at
+                elapsed = timedelta(elapsed.days, elapsed.seconds)
+            else:
+                elapsed = None
+
             output.add_row(
                 [
-                    entry["created_at"],
+                    datetime.fromisoformat(
+                        entry["created_at"].replace("Z", "+00:00")
+                    ).strftime("%Y/%m/%d %H:%M"),
                     entry["operation"],
                     entry["workspace"]["name"],
                     entry["backend"],
                     status,
+                    elapsed,
                 ]
             )
         print(output)
