@@ -3,4 +3,8 @@ model.log
 */input.csv
 __pycache__
 .python-version
-outputs/*
+outputs*
+
+# setuptools stuff
+*.egg-info
+.eggs
