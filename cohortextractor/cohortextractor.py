@@ -8,6 +8,7 @@ import cohortextractor
 import datetime
 from datetime import timedelta
 import glob
+import logging
 import importlib
 import os
 import re
@@ -275,6 +276,9 @@ def main():
     )
     # Cohort parser options
     parser.add_argument("--version", help="Display version", action="store_true")
+    parser.add_argument(
+        "--verbose", help="Show extra logging info", action="store_true"
+    )
     subparsers = parser.add_subparsers(help="sub-command help")
     generate_cohort_parser = subparsers.add_parser(
         "generate_cohort", help="Generate cohort"
@@ -477,6 +481,7 @@ def main():
         )
         os.makedirs(options.high_privacy_output_dir, exist_ok=True)
         os.makedirs(options.medium_privacy_output_dir, exist_ok=True)
+        log_level = options.verbose and logging.INFO or logging.ERROR
         result = localrun(
             options.action,
             options.backend,
@@ -485,6 +490,7 @@ def main():
             options.medium_privacy_output_dir,
             force_run=options.force_run,
             force_run_dependencies=options.force_run_dependencies,
+            log_level=log_level,
         )
         if result:
             print("Generated outputs:")

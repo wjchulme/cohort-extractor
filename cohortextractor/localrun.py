@@ -12,6 +12,7 @@ def localrun(
     medium_privacy_storage_base,
     force_run=False,
     force_run_dependencies=False,
+    log_level=logging.WARNING,
 ):
     repo = get_repo()
     job_spec = {
@@ -36,5 +37,5 @@ def localrun(
     os.environ["HIGH_PRIVACY_STORAGE_BASE"] = high_privacy_storage_base
     os.environ["MEDIUM_PRIVACY_STORAGE_BASE"] = medium_privacy_storage_base
     job = Job(job_spec, workdir=os.getcwd())
-    # job.logger.setLevel(logging.WARNING)
+    job.logger.setLevel(log_level)
     return job.main()
