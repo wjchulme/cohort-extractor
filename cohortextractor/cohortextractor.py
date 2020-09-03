@@ -413,7 +413,7 @@ def main():
     )
     remote_run_subparser.add_argument(
         "backend",
-        choices=["tpp", "all"],
+        choices=["tpp", "test", "all"],
         type=str,
         default="all",
     )
