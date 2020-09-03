@@ -18,6 +18,7 @@ def localrun(
     job_spec = {
         "url": "",
         "backend": backend,
+        "pk": None,
         "run_locally": True,
         "action_id": action_id,
         "force_run": force_run,

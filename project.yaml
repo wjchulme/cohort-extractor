@@ -1,0 +1,13 @@
+version: '1.0'
+actions:
+  generate_cohort:
+    run: cohortextractor:latest generate_cohort --output-dir=/workspace
+    outputs:
+      highly_sensitive:
+        cohort: input.csv
+  test_stata:
+    needs: [generate_cohort]
+    run: stata-mp:latest analysis/model.do ${{ needs.generate_cohort.outputs.highly_sensitive.cohort }}
+    outputs:
+      moderately_sensitive:
+        log: model.log
