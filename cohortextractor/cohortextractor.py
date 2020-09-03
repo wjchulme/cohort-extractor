@@ -466,7 +466,9 @@ def main():
     )
 
     options = parser.parse_args()
-    if options.force_run_dependencies and not options.force_run:
+    if getattr(options, "force_run_dependencies", False) and not getattr(
+        options, "force_run", False
+    ):
         parser.error("`--force-run-dependencies` requires `--force-run`")
     if options.version:
         print(f"v{cohortextractor.__version__}")
