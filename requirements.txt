@@ -11,15 +11,15 @@ click==7.0                # via pip-tools, presto-python-client
 cycler==0.10.0            # via matplotlib
 decorator==4.4.2          # via networkx
 idna==2.9                 # via requests
-file:///home/seb/Code/opensafely/job-runner  # via -r requirements.in
 kiwisolver==1.2.0         # via matplotlib
 matplotlib==3.2.1         # via seaborn
 more-itertools==8.3.0     # via pytest
-networkx==2.4             # via jobrunner
+networkx==2.4             # via opensafely-jobrunner
 numpy==1.18.1             # via matplotlib, pandas, scipy, seaborn
+opensafely-jobrunner==1.0.0.post4351245  # via -r requirements.in
 packaging==20.4           # via pytest
 pandas==1.0.1             # via -r requirements.in, seaborn
-pebble==4.5.3             # via jobrunner
+pebble==4.5.3             # via opensafely-jobrunner
 pip-tools==5.2.0          # via -r requirements.in
 pluggy==0.13.1            # via pytest
 presto-python-client==0.7.0  # via -r requirements.in
@@ -30,8 +30,8 @@ pyparsing==2.4.7          # via matplotlib, packaging
 pytest==5.4.2             # via -r requirements.in
 python-dateutil==2.8.1    # via matplotlib, pandas
 pytz==2019.3              # via pandas
-pyyaml==5.3.1             # via -r requirements.in, jobrunner
-requests==2.23.0          # via -r requirements.in, jobrunner, presto-python-client
+pyyaml==5.3.1             # via -r requirements.in, opensafely-jobrunner
+requests==2.23.0          # via -r requirements.in, opensafely-jobrunner, presto-python-client
 scipy==1.4.1              # via seaborn
 seaborn==0.10.1           # via -r requirements.in
 six==1.14.0               # via packaging, pip-tools, presto-python-client, python-dateutil

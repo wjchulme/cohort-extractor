@@ -10,5 +10,4 @@ seaborn
 sqlalchemy
 sqlparse
 tinynetrc
-#git+https://github.com/opensafely/job-runner.git@project-yaml-support#egg=jobrunner
-/home/seb/Code/opensafely/job-runner
+opensafely-jobrunner
