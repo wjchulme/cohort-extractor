@@ -92,7 +92,7 @@ def list_workspaces():
 
 
 def submit_job(
-    workspace_id, backend, action, force_run=False, force_run_dependencies=False
+    workspace_id, backend, action_id, force_run=False, force_run_dependencies=False
 ):
     allowed_backends = ["all", "tpp"]
     if backend == "all":
@@ -107,7 +107,8 @@ def submit_job(
         data = {
             "force_run": force_run,
             "force_run_dependencies": force_run_dependencies,
-            "operation": action,
+            "action_id": action_id,
+            "backend": backend,
             "workspace_id": existing_workspace[0]["id"],
         }
         callback_url = os.environ.get("EBMBOT_CALLBACK_URL", "")

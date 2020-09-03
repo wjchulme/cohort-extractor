@@ -5,7 +5,7 @@ from cohortextractor.remotejobs import get_repo, get_branch
 
 
 def localrun(
-    operation,
+    action_id,
     backend,
     db,
     high_privacy_storage_base,
@@ -19,7 +19,7 @@ def localrun(
         "url": "",
         "backend": backend,
         "run_locally": True,
-        "operation": operation,
+        "action_id": action_id,
         "force_run": force_run,
         "force_run_dependencies": force_run_dependencies,
         "workspace": {

@@ -577,7 +577,7 @@ def main():
                     datetime.fromisoformat(
                         entry["created_at"].replace("Z", "+00:00")
                     ).strftime("%Y/%m/%d %H:%M"),
-                    entry["operation"],
+                    entry["action_id"],
                     entry["workspace"]["name"],
                     entry["backend"],
                     status,
