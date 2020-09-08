@@ -4,12 +4,49 @@ import warnings
 
 import sqlalchemy
 from sqlalchemy.engine.url import URL
+from sqlalchemy.dialects.mssql.pymssql import MSDialect
+from sqlalchemy.dialects import registry
+
+
+registry.register("mssql.ctds", __name__, "CTDSDialect")
 
 
 # Some drivers warn about the use of features marked "optional" in the DB-ABI
 # spec, using a standardised set of warnings. See:
 # https://www.python.org/dev/peps/pep-0249/#optional-db-api-extensions
 warnings.filterwarnings("ignore", re.escape("DB-API extension cursor.__iter__() used"))
+
+
+class CTDSDialect(MSDialect):
+    driver = "ctds"
+    paramstyle = "named"
+
+    @classmethod
+    def dbapi(cls):
+        module = __import__("ctds")
+        module.paramstyle = cls.paramstyle
+        return module
+
+    def _get_server_version_info(self, connection):
+        vers = connection.scalar("select @@version")
+        m = re.match(r"Microsoft .*? - (\d+).(\d+).(\d+).(\d+)", vers)
+        if m:
+            return tuple(int(x) for x in m.group(1, 2, 3, 4))
+        else:
+            return None
+
+    def create_connect_args(self, url):
+        kwargs = url.translate_connect_args(username="user")
+        kwargs.update(url.query)
+        kwargs["server"] = kwargs.pop("host")
+        kwargs["paramstyle"] = self.paramstyle
+        return (), kwargs
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+        if not parameters:
+            cursor.execute(statement)
+        else:
+            cursor.execute(statement, parameters)
 
 
 def mssql_connection_params_from_url(url):
@@ -81,6 +118,5 @@ def _ctds_connect(ctds, params):
 
 def mssql_sqlalchemy_engine_from_url(url):
     params = mssql_connection_params_from_url(url)
-    params["drivername"] = "mssql+pyodbc"
-    params["query"] = {"driver": "ODBC Driver 17 for SQL Server"}
+    params["drivername"] = "mssql+ctds"
     return sqlalchemy.create_engine(URL(**params))
