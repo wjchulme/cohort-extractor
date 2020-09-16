@@ -501,11 +501,10 @@ def main():
 
             for action in result:
                 for location in action["output_locations"]:
-                    location = os.path.relpath(location)
                     output.add_row(
                         [
                             action["status_message"],
-                            location,
+                            location["relative_path"],
                         ]
                     )
             print(output)
