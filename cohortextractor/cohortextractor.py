@@ -483,7 +483,7 @@ def main():
         )
         os.makedirs(options.high_privacy_output_dir, exist_ok=True)
         os.makedirs(options.medium_privacy_output_dir, exist_ok=True)
-        log_level = options.verbose and logging.INFO or logging.ERROR
+        log_level = options.verbose and logging.DEBUG or logging.ERROR
         result = localrun(
             options.action,
             options.backend,
